@@ -48,6 +48,17 @@ char *find_command_in_path(const char *command) {
     return NULL;
 }
 
+// return the current working directory
+char *get_current_working_directory() {
+    char *cwd = malloc(1024);
+    if (getcwd(cwd, 1024) != NULL) {
+        return cwd;
+    } else {
+        free(cwd);
+        return NULL;
+    }
+}
+
 int main(int argc, char *argv[]) {
     // Flush after every printf
     setbuf(stdout, NULL);
@@ -98,6 +109,15 @@ int main(int argc, char *argv[]) {
                 } else {
                     printf("%s: not found\n", token);
                 }
+            }
+        }
+        else if (strcmp(command, "pwd") == 0) {
+            char *cwd = get_current_working_directory();
+            if (cwd != NULL) {
+                printf("%s\n", cwd);
+                free(cwd);
+            } else {
+                printf("pwd: error retrieving current directory\n");
             }
         }
         else {
