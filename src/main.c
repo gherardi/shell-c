@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <unistd.h>
 
 #ifdef _WIN32
@@ -10,6 +11,18 @@
 #endif
 
 #define MAX_INPUT 256
+
+const char *builtin_commands[] = {"exit", "echo", "type", "pwd"};
+const int builtin_count = sizeof(builtin_commands) / sizeof(builtin_commands[0]);
+
+bool is_builtin(const char *command) {
+    for (int i = 0; i < builtin_count; i++) {
+        if (strcmp(builtin_commands[i], command) == 0) {
+            return true; 
+        }
+    }
+    return false;
+}
 
 // search for a command in the PATH environment variable
 // returns the full path if found, NULL otherwise
@@ -59,6 +72,61 @@ char *get_current_working_directory() {
     }
 }
 
+// Handle builtin echo command
+void handle_echo(void) {
+    char *args = strtok(NULL, " ");
+    while (args != NULL) {
+        printf("%s ", args);
+        args = strtok(NULL, " ");
+    }
+    printf("\n");
+}
+
+// Handle builtin type command
+void handle_type(void) {
+    // token is the command to check
+    char *token = strtok(NULL, " ");
+    if (is_builtin(token)) {
+        printf("%s is a shell builtin\n", token);
+    } else {
+        char *fullpath = find_command_in_path(token);
+        if (fullpath != NULL) {
+            printf("%s is %s\n", token, fullpath);
+            free(fullpath);
+        } else {
+            printf("%s: not found\n", token);
+        }
+    }
+}
+
+// Handle builtin pwd command
+void handle_pwd(void) {
+    char *cwd = get_current_working_directory();
+    if (cwd != NULL) {
+        printf("%s\n", cwd);
+        free(cwd);
+    } else {
+        printf("pwd: error retrieving current directory\n");
+    }
+}
+
+// Handle custom command execution
+void handle_command(const char *input) {
+    char input_copy[MAX_INPUT];
+    strncpy(input_copy, input, sizeof(input_copy) - 1);
+    input_copy[sizeof(input_copy) - 1] = '\0';
+    
+    char *command = strtok(input_copy, " ");
+    char *fullpath = find_command_in_path(command);
+    
+    if (fullpath != NULL) {
+        system(input);
+        free(fullpath);
+    } else {
+        printf("%s: command not found\n", input);
+    }
+}
+
 int main(int argc, char *argv[]) {
     // Flush after every printf
     setbuf(stdout, NULL);
@@ -78,58 +146,16 @@ int main(int argc, char *argv[]) {
 
         if (command == NULL) continue;
 
-        if (strcmp(command, "exit") == 0) break;
-        else if (strcmp(command, "echo") == 0) {
-            char *args = strtok(NULL, " ");
-            // print all remaining arguments
-            while (args != NULL) {
-                printf("%s ", args);
-                args = strtok(NULL, " ");
-            }
-            printf("\n");
-        }
-        else if (strcmp(command, "type") == 0) {
-            // token is equal to the command to be checked
-            char *token = strtok(NULL, " ");
-            // if (args == NULL) {
-            //     printf("type: missing argument\n");
-            //     continue;
-            // }
-            if (strcmp(token, "echo") == 0
-                || strcmp(token, "exit") == 0
-                || strcmp(token, "type") == 0
-                || strcmp(token, "pwd") == 0
-            ) {
-                printf("%s is a shell builtin\n", token);
-            } else {
-                char *fullpath = find_command_in_path(token);
-                
-                if (fullpath != NULL) {
-                    printf("%s is %s\n", token, fullpath);
-                    free(fullpath);
-                } else {
-                    printf("%s: not found\n", token);
-                }
-            }
-        }
-        else if (strcmp(command, "pwd") == 0) {
-            char *cwd = get_current_working_directory();
-            if (cwd != NULL) {
-                printf("%s\n", cwd);
-                free(cwd);
-            } else {
-                printf("pwd: error retrieving current directory\n");
-            }
-        }
-        else {
-            char *fullpath = find_command_in_path(command);
-            
-            if (fullpath != NULL) {
-                system(input);
-                free(fullpath);
-            } else {
-                printf("%s: command not found\n", input);
-            }
+        if (strcmp(command, "exit") == 0) {
+            break;
+        } else if (strcmp(command, "echo") == 0) {
+            handle_echo();
+        } else if (strcmp(command, "type") == 0) {
+            handle_type();
+        } else if (strcmp(command, "pwd") == 0) {
+            handle_pwd();
+        } else {
+            handle_command(input);
         }
     }
 
