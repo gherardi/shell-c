@@ -9,49 +9,54 @@
     #define PATH_SEP ":"
 #endif
 
+#define MAX_INPUT 256
+
 int main(int argc, char *argv[]) {
     // Flush after every printf
     setbuf(stdout, NULL);
 
     while (1) {
-        // print shell prompt
         printf("$ ");
 
-        // get user input
-        char input[256];
-        fgets(input, sizeof(input), stdin);
+        char input[MAX_INPUT];
+        // fgets(input, sizeof(input), stdin);
+        if (fgets(input, sizeof(input), stdin) == NULL) break;
+        input[strlen(input) - 1] = '\0';
 
-        // handle commands
-        input[strlen(input) - 1] = '\0'; // remove newline character
+        char input_copy[MAX_INPUT];
+        strncpy(input_copy, input, sizeof(input_copy) - 1);
+        input_copy[sizeof(input_copy) - 1] = '\0';
 
-        char *token = strtok(input, " ");
+        char *command = strtok(input_copy, " ");
 
-        if (strcmp(token, "exit") == 0){
-            break;
-        }
-        else if (strcmp(token, "echo") == 0) {
-            token = strtok(NULL, " ");
-            while (token != NULL) {
-                printf("%s ", token);
-                token = strtok(NULL, " ");
+        if (command == NULL) continue;
+
+        if (strcmp(command, "exit") == 0) break;
+        else if (strcmp(command, "echo") == 0) {
+            char *args = strtok(NULL, " ");
+            // print all remaining arguments
+            while (args != NULL) {
+                printf("%s ", args);
+                args = strtok(NULL, " ");
             }
             printf("\n");
         }
-        else if (strcmp(token, "type") == 0) {
-            token = strtok(NULL, " ");
-            if (token == NULL) {
-                printf("type: missing argument\n");
-                continue;
-            }
-            if (strcmp(token, "echo") == 0) {
-                printf("%s is a shell builtin\n", token);
-            } else if (strcmp(token, "exit") == 0) {
-                printf("%s is a shell builtin\n", token);
-            } else if (strcmp(token, "type") == 0) {
+        else if (strcmp(command, "type") == 0) {
+            // token is equal to the command to be checked
+            char *token = strtok(NULL, " ");
+            // if (args == NULL) {
+            //     printf("type: missing argument\n");
+            //     continue;
+            // }
+            if (strcmp(token, "echo") == 0
+                || strcmp(token, "exit") == 0
+                || strcmp(token, "type") == 0
+            ) {
                 printf("%s is a shell builtin\n", token);
             } else {
-                // not a builtin command
-                // check if it exists in PATH
+
+                bool executable_found = 0;
+                
                 char *path_env = getenv("PATH");
 
                 if (path_env == NULL) {
@@ -59,9 +64,13 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
 
+                // Copia PATH per evitare di modificare la variabile d'ambiente
+                char path_copy[2048];
+                strncpy(path_copy, path_env, sizeof(path_copy) - 1);
+                path_copy[sizeof(path_copy) - 1] = '\0';
+
                 // tokenize PATH, split by PATH_SEP
-                char *dir = strtok(path_env, PATH_SEP);
-                int found = 0;
+                char *dir = strtok(path_copy, PATH_SEP);
 
                 // iterate through each directory in PATH to find the command
                 while (dir != NULL) {
@@ -72,14 +81,14 @@ int main(int argc, char *argv[]) {
                     // check if the file exists and is executable
                     if (access(fullpath, X_OK) == 0) {
                         printf("%s is %s\n", token, fullpath);
-                        found = 1;
+                        executable_found = 1;
                         break;
                     }
 
                     dir = strtok(NULL, PATH_SEP);
                 }
 
-                if (!found) {
+                if (!executable_found) {
                     printf("%s: not found\n", token);
                 }
             }
