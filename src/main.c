@@ -11,6 +11,43 @@
 
 #define MAX_INPUT 256
 
+// search for a command in the PATH environment variable
+// returns the full path if found, NULL otherwise
+char *find_command_in_path(const char *command) {
+    char *path_env = getenv("PATH");
+    
+    if (path_env == NULL) {
+        return NULL;
+    }
+
+    // Copia PATH per evitare di modificare la variabile d'ambiente
+    char path_copy[2048];
+    strncpy(path_copy, path_env, sizeof(path_copy) - 1);
+    path_copy[sizeof(path_copy) - 1] = '\0';
+
+    // tokenize PATH, split by PATH_SEP
+    char *dir = strtok(path_copy, PATH_SEP);
+
+    // iterate through each directory in PATH to find the command
+    while (dir != NULL) {
+        // build the full path to the command eg: /usr/bin/ls
+        char fullpath[512];
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", dir, command);
+
+        // check if the file exists and is executable
+        if (access(fullpath, X_OK) == 0) {
+            // Ritorna una copia allocata dinamicamente del percorso
+            char *result = malloc(strlen(fullpath) + 1);
+            strcpy(result, fullpath);
+            return result;
+        }
+
+        dir = strtok(NULL, PATH_SEP);
+    }
+
+    return NULL;
+}
+
 int main(int argc, char *argv[]) {
     // Flush after every printf
     setbuf(stdout, NULL);
@@ -19,7 +56,6 @@ int main(int argc, char *argv[]) {
         printf("$ ");
 
         char input[MAX_INPUT];
-        // fgets(input, sizeof(input), stdin);
         if (fgets(input, sizeof(input), stdin) == NULL) break;
         input[strlen(input) - 1] = '\0';
 
@@ -54,47 +90,25 @@ int main(int argc, char *argv[]) {
             ) {
                 printf("%s is a shell builtin\n", token);
             } else {
-
-                bool executable_found = 0;
+                char *fullpath = find_command_in_path(token);
                 
-                char *path_env = getenv("PATH");
-
-                if (path_env == NULL) {
-                    printf("%s: not found\n", token);
-                    continue;
-                }
-
-                // Copia PATH per evitare di modificare la variabile d'ambiente
-                char path_copy[2048];
-                strncpy(path_copy, path_env, sizeof(path_copy) - 1);
-                path_copy[sizeof(path_copy) - 1] = '\0';
-
-                // tokenize PATH, split by PATH_SEP
-                char *dir = strtok(path_copy, PATH_SEP);
-
-                // iterate through each directory in PATH to find the command
-                while (dir != NULL) {
-                    // build the full path to the command eg: /usr/bin/ls
-                    char fullpath[512];
-                    snprintf(fullpath, sizeof(fullpath), "%s/%s", dir, token);
-
-                    // check if the file exists and is executable
-                    if (access(fullpath, X_OK) == 0) {
-                        printf("%s is %s\n", token, fullpath);
-                        executable_found = 1;
-                        break;
-                    }
-
-                    dir = strtok(NULL, PATH_SEP);
-                }
-
-                if (!executable_found) {
+                if (fullpath != NULL) {
+                    printf("%s is %s\n", token, fullpath);
+                    free(fullpath);
+                } else {
                     printf("%s: not found\n", token);
                 }
             }
         }
         else {
-            printf("%s: command not found\n", input);
+            char *fullpath = find_command_in_path(command);
+            
+            if (fullpath != NULL) {
+                system(input);
+                free(fullpath);
+            } else {
+                printf("%s: command not found\n", input);
+            }
         }
     }
 
