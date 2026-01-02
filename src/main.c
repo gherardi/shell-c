@@ -3,23 +3,38 @@
 #include <string.h>
 
 int main(int argc, char *argv[]) {
-  // Flush after every printf
-  setbuf(stdout, NULL);
-  
-  while (1) {
-    // print shell prompt
-    printf("$ ");
-    
-    // get user input
-    char input[256];
-    fgets(input, sizeof(input), stdin);
+    // Flush after every printf
+    setbuf(stdout, NULL);
 
-    
-    // handle invalid commands
-    input[strlen(input) - 1] = '\0'; // remove newline character
-    if (strcmp(input, "exit") == 0) break; // exit command
-    printf("%s: command not found\n", input);
-  }
+    while (1) {
+        // print shell prompt
+        printf("$ ");
 
-  return 0;
+        // get user input
+        char input[256];
+        fgets(input, sizeof(input), stdin);
+
+        // handle commands
+        input[strlen(input) - 1] = '\0'; // remove newline character
+
+        char *token = strtok(input, " ");
+
+        if (strcmp(token, "exit") == 0){
+            break;
+        }
+        else if (strcmp(token, "echo") == 0) {
+            token = strtok(NULL, " ");
+            while (token != NULL) {
+                printf("%s\n", token);
+                token = strtok(NULL, " ");
+            }
+        }
+        else {
+            printf("%s: command not found", input);
+        }
+
+        printf("\n");
+    }
+
+    return 0;
 }
