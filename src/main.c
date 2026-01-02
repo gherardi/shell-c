@@ -25,15 +25,14 @@ int main(int argc, char *argv[]) {
         else if (strcmp(token, "echo") == 0) {
             token = strtok(NULL, " ");
             while (token != NULL) {
-                printf("%s\n", token);
+                printf("%s ", token);
                 token = strtok(NULL, " ");
             }
+            printf("\n");
         }
         else {
-            printf("%s: command not found", input);
+            printf("%s: command not found\n", input);
         }
-
-        printf("\n");
     }
 
     return 0;
