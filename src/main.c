@@ -30,6 +30,18 @@ int main(int argc, char *argv[]) {
             }
             printf("\n");
         }
+        else if (strcmp(token, "type") == 0) {
+            token = strtok(NULL, " ");
+            if (strcmp(token, "echo") == 0) {
+                printf("%s is a shell builtin\n", token);
+            } else if (strcmp(token, "exit") == 0) {
+                printf("%s is a shell builtin\n", token);
+            } else if (strcmp(token, "type") == 0) {
+                printf("%s is a shell builtin\n", token);
+            } else {
+                printf("%s: not found\n", token);
+            }
+        }
         else {
             printf("%s: command not found\n", input);
         }
