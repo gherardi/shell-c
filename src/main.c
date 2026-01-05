@@ -6,23 +6,48 @@
 #include <limits.h>
 
 #ifdef _WIN32
-    #define PATH_SEP ";"
+    #define PATH_SEPARATOR ";"
 #else
-    #define PATH_SEP ":"
+    #define PATH_SEPARATOR ":"
 #endif
 
-// todo: associate builtin commands with their handlers and avoid multiple strcmp calls
-// todo: use these associations to reduce complexity in main loop
-const char *builtin_commands[] = {"exit", "echo", "type", "pwd", "cd"};
-const int builtin_count = sizeof(builtin_commands) / sizeof(builtin_commands[0]);
+#define MAX_INPUT 1024
+#define MAX_ARGS 64
 
-bool is_builtin(const char *command) {
+typedef void (*cmd_handler_t)(void);
+
+typedef struct {
+    const char *name;
+    cmd_handler_t handler;
+} Builtin;
+
+void handle_exit(void);
+void handle_echo(void);
+void handle_type(void);
+void handle_pwd(void);
+void handle_cd(void);
+
+const Builtin builtins[] = {
+    {"exit", handle_exit},
+    {"echo", handle_echo},
+    {"type", handle_type},
+    {"pwd", handle_pwd},
+    {"cd", handle_cd}
+};
+
+const int builtin_count = sizeof(builtins) / sizeof(builtins[0]);
+
+cmd_handler_t find_builtin_handler(const char *command) {
     for (int i = 0; i < builtin_count; i++) {
-        if (strcmp(builtin_commands[i], command) == 0) {
-            return true; 
+        if (strcmp(builtins[i].name, command) == 0) {
+            return builtins[i].handler;
         }
     }
-    return false;
+    return NULL;
+}
+
+bool is_builtin(const char *command) {
+    return find_builtin_handler(command) != NULL;
 }
 
 // search for a command in the PATH environment variable
@@ -30,17 +55,14 @@ bool is_builtin(const char *command) {
 char *find_command_in_path(const char *command) {
     char *path_env = getenv("PATH");
     
-    if (path_env == NULL) {
-        return NULL;
-    }
+    if (path_env == NULL) return NULL;
 
-    // Copia PATH per evitare di modificare la variabile d'ambiente
     char path_copy[2048];
     strncpy(path_copy, path_env, sizeof(path_copy) - 1);
     path_copy[sizeof(path_copy) - 1] = '\0';
 
-    // tokenize PATH, split by PATH_SEP
-    char *dir = strtok(path_copy, PATH_SEP);
+    // tokenize PATH, split by PATH_SEPARATOR
+    char *dir = strtok(path_copy, PATH_SEPARATOR);
 
     // iterate through each directory in PATH to find the command
     while (dir != NULL) {
@@ -56,13 +78,12 @@ char *find_command_in_path(const char *command) {
             return result;
         }
 
-        dir = strtok(NULL, PATH_SEP);
+        dir = strtok(NULL, PATH_SEPARATOR);
     }
 
     return NULL;
 }
 
-// return the current working directory
 char *get_current_working_directory() {
     char *cwd = malloc(1024);
     if (getcwd(cwd, 1024) != NULL) {
@@ -73,7 +94,16 @@ char *get_current_working_directory() {
     }
 }
 
-// Handle builtin echo command
+void change_directory(const char *path) {
+    if (chdir(path) != 0) {
+        perror("cd");
+    }
+}
+
+void handle_exit(void) {
+    exit(0);
+}
+
 void handle_echo(void) {
     char *args = strtok(NULL, " ");
     while (args != NULL) {
@@ -83,7 +113,6 @@ void handle_echo(void) {
     printf("\n");
 }
 
-// Handle builtin type command
 void handle_type(void) {
     // token is the command to check
     char *token = strtok(NULL, " ");
@@ -100,7 +129,6 @@ void handle_type(void) {
     }
 }
 
-// Handle builtin pwd command
 void handle_pwd(void) {
     char *cwd = get_current_working_directory();
     if (cwd != NULL) {
@@ -108,12 +136,6 @@ void handle_pwd(void) {
         free(cwd);
     } else {
         printf("pwd: error retrieving current directory\n");
-    }
-}
-
-void change_directory(const char *path) {
-    if (chdir(path) != 0) {
-        perror("cd");
     }
 }
 
@@ -127,8 +149,6 @@ void handle_cd(void) {
     } else if (dir[0] == '~') {
         char *home = getenv("HOME");
         if (home != NULL) {
-            // Sostituisce ~ con il contenuto di HOME
-            // dir + 1 serve a prendere tutto ciò che segue la tilde
             snprintf(expanded_path, sizeof(expanded_path), "%s%s", home, dir + 1);
             dir = expanded_path;
         }
@@ -151,7 +171,7 @@ void handle_cd(void) {
 }
 
 // Handle custom command execution
-void handle_command(const char *input) {
+void handle_external_command(const char *input) {
     char input_copy[MAX_INPUT];
     strncpy(input_copy, input, sizeof(input_copy) - 1);
     input_copy[sizeof(input_copy) - 1] = '\0';
@@ -168,36 +188,37 @@ void handle_command(const char *input) {
 }
 
 int main(int argc, char *argv[]) {
-    // Flush after every printf
+    // disable output buffering for stdout
     setbuf(stdout, NULL);
 
     while (1) {
         printf("$ ");
 
-        char input[MAX_INPUT];
-        if (fgets(input, sizeof(input), stdin) == NULL) break;
-        input[strlen(input) - 1] = '\0';
+        char user_input[MAX_INPUT];
+        if (fgets(user_input, sizeof(user_input), stdin) == NULL) break;
 
+        user_input[strlen(user_input) - 1] = '\0'; // remove newline character that fgets adds
+
+        if (strlen(user_input) == 0) continue;
+
+        // make a copy of user_input to tokenize it
         char input_copy[MAX_INPUT];
-        strncpy(input_copy, input, sizeof(input_copy) - 1);
+        strncpy(input_copy, user_input, sizeof(input_copy) - 1);
         input_copy[sizeof(input_copy) - 1] = '\0';
 
-        char *command = strtok(input_copy, " ");
+        // extract the first token as command
+        // strtok saves state internally for next calls
+        char *command_name = strtok(input_copy, " ");
 
-        if (command == NULL) continue;
+        if (command_name == NULL) continue;
 
-        if (strcmp(command, "exit") == 0) {
-            break;
-        } else if (strcmp(command, "echo") == 0) {
-            handle_echo();
-        } else if (strcmp(command, "type") == 0) {
-            handle_type();
-        } else if (strcmp(command, "pwd") == 0) {
-            handle_pwd();
-        } else if (strcmp(command, "cd") == 0) {
-            handle_cd();
+        cmd_handler_t handler = find_builtin_handler(command_name);
+
+        if (handler != NULL) {
+            handler();
         } else {
-            handle_command(input);
+            // try as an external command
+            handle_external_command(user_input);
         }
     }
 
