@@ -110,6 +110,35 @@ void handle_pwd(void) {
     }
 }
 
+void change_directory(const char *path) {
+    if (chdir(path) != 0) {
+        perror("cd");
+    }
+}
+
+void handle_cd(void) {
+    char *dir = strtok(NULL, " ");
+    if (dir == NULL) {
+        printf("cd: missing argument\n");
+        return;
+    }
+
+    // check if the directory exists
+    if (access(dir, F_OK) != 0) {
+        printf("cd: %s: No such file or directory\n", dir);
+        return;
+    }
+
+    // check if we have execute permission on the directory to enter it
+    if (access(dir, X_OK) != 0) {
+        printf("cd: %s: Permission denied\n", dir);
+        return;
+    }
+
+    // try to change directory
+    change_directory(dir);
+}
+
 // Handle custom command execution
 void handle_command(const char *input) {
     char input_copy[MAX_INPUT];
@@ -154,6 +183,8 @@ int main(int argc, char *argv[]) {
             handle_type();
         } else if (strcmp(command, "pwd") == 0) {
             handle_pwd();
+        } else if (strcmp(command, "cd") == 0) {
+            handle_cd();
         } else {
             handle_command(input);
         }
