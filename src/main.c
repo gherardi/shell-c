@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <limits.h>
 
 #ifdef _WIN32
     #define PATH_SEP ";"
@@ -10,9 +11,9 @@
     #define PATH_SEP ":"
 #endif
 
-#define MAX_INPUT 256
-
-const char *builtin_commands[] = {"exit", "echo", "type", "pwd"};
+// todo: associate builtin commands with their handlers and avoid multiple strcmp calls
+// todo: use these associations to reduce complexity in main loop
+const char *builtin_commands[] = {"exit", "echo", "type", "pwd", "cd"};
 const int builtin_count = sizeof(builtin_commands) / sizeof(builtin_commands[0]);
 
 bool is_builtin(const char *command) {
@@ -118,9 +119,19 @@ void change_directory(const char *path) {
 
 void handle_cd(void) {
     char *dir = strtok(NULL, " ");
+    char expanded_path[PATH_MAX];
+
     if (dir == NULL) {
         printf("cd: missing argument\n");
         return;
+    } else if (dir[0] == '~') {
+        char *home = getenv("HOME");
+        if (home != NULL) {
+            // Sostituisce ~ con il contenuto di HOME
+            // dir + 1 serve a prendere tutto ciò che segue la tilde
+            snprintf(expanded_path, sizeof(expanded_path), "%s%s", home, dir + 1);
+            dir = expanded_path;
+        }
     }
 
     // check if the directory exists
