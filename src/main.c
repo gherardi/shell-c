@@ -36,11 +36,17 @@ Args parse_arguments(const char *input) {
     int buf_index = 0;
     int in_single_quote = 0;
     int in_double_quote = 0;
-    
+
     for (int i = 0; input[i] != '\0' && args.count < MAX_ARGS; i++) {
         char c = input[i];
-        
-        if (c == '\'' && !in_double_quote) {
+
+        // handle escape character (but not inside single quotes)
+        if (c == '\\' && !in_single_quote && !in_double_quote) {
+            // handle escaped characters
+            if (i + 1 < strlen(input)) {
+                buffer[buf_index++] = input[++i];
+            }
+        } else if (c == '\'' && !in_double_quote) {
             // toggle single quote (but not if inside double quotes)
             in_single_quote = !in_single_quote;
         } else if (c == '"' && !in_single_quote) {
