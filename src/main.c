@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <ctype.h>
+#include <sys/wait.h>
 
 #ifdef _WIN32
     #define PATH_SEPARATOR ";"
@@ -241,18 +242,22 @@ void handle_external_command(char **argv) {
     char *fullpath = find_command_in_path(argv[0]);
     
     if (fullpath != NULL) {
-        // reconstruct the full command with arguments
-        char command[MAX_INPUT];
-        command[0] = '\0';
+        // use fork and execvp to avoid shell re-parsing arguments
+        pid_t pid = fork();
         
-        for (int i = 0; argv[i] != NULL; i++) {
-            strcat(command, argv[i]);
-            if (argv[i + 1] != NULL) {
-                strcat(command, " ");
-            }
+        if (pid == -1) {
+            perror("fork");
+        } else if (pid == 0) {
+            // child process - execute the command
+            execvp(fullpath, argv);
+            // if execvp returns, there was an error
+            perror(argv[0]);
+            exit(1);
+        } else {
+            // parent process - wait for child to complete
+            waitpid(pid, NULL, 0);
         }
         
-        system(command);
         free(fullpath);
     } else {
         printf("%s: command not found\n", argv[0]);
