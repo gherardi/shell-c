@@ -42,14 +42,25 @@ Args parse_arguments(const char *input) {
         char c = input[i];
 
         // handle escape character (outside quotes or inside double quotes)
-        if (c == '\\' && (in_double_quote || !in_single_quote)) {
-            // handle escaped characters
+        if (c == '\\' && !in_single_quote) {
+            // inside double quotes, only certain characters can be escaped: " $ ` \ and newline
+            // outside quotes, any character following \ is treated literally
             if (i + 1 < strlen(input)) {
                 char next_char = input[i + 1];
-                // In double quotes, \\ becomes \, \" becomes ", \$ becomes $, etc.
-                // Outside quotes, any character following \ is treated literally
-                buffer[buf_index++] = next_char;
-                i++;
+                if (in_double_quote) {
+                    // inside double quotes: only escape special chars
+                    if (next_char == '"' || next_char == '$' || next_char == '`' || next_char == '\\') {
+                        buffer[buf_index++] = next_char;
+                        i++;
+                    } else {
+                        // not a special char, keep the backslash
+                        buffer[buf_index++] = c;
+                    }
+                } else {
+                    // outside quotes: escape any character
+                    buffer[buf_index++] = next_char;
+                    i++;
+                }
             }
         } else if (c == '\'' && !in_double_quote) {
             // toggle single quote (but not if inside double quotes)
