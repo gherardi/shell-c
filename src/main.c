@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <limits.h>
+#include <ctype.h>
 
 #ifdef _WIN32
     #define PATH_SEPARATOR ";"
@@ -14,18 +15,74 @@
 #define MAX_INPUT 1024
 #define MAX_ARGS 64
 
-typedef void (*cmd_handler_t)(void);
+typedef void (*cmd_handler_t)(char **);
+
+typedef struct {
+    char *args[MAX_ARGS];
+    int count;
+} Args;
 
 typedef struct {
     const char *name;
     cmd_handler_t handler;
 } Builtin;
 
-void handle_exit(void);
-void handle_echo(void);
-void handle_type(void);
-void handle_pwd(void);
-void handle_cd(void);
+// parse command line respecting single and double quotes
+// returns Args struct with parsed arguments
+Args parse_arguments(const char *input) {
+    Args args = {{NULL}, 0};
+    char buffer[MAX_INPUT];
+    int buf_index = 0;
+    int in_single_quote = 0;
+    int in_double_quote = 0;
+    
+    for (int i = 0; input[i] != '\0' && args.count < MAX_ARGS; i++) {
+        char c = input[i];
+        
+        if (c == '\'' && !in_double_quote) {
+            // toggle single quote (but not if inside double quotes)
+            in_single_quote = !in_single_quote;
+        } else if (c == '"' && !in_single_quote) {
+            // toggle double quote (but not if inside single quotes)
+            in_double_quote = !in_double_quote;
+        } else if (isspace(c) && !in_single_quote && !in_double_quote) {
+            // whitespace outside quotes - end of argument
+            if (buf_index > 0) {
+                buffer[buf_index] = '\0';
+                args.args[args.count] = malloc(buf_index + 1);
+                strcpy(args.args[args.count], buffer);
+                args.count++;
+                buf_index = 0;
+            }
+        } else {
+            // regular character (or inside quotes)
+            buffer[buf_index++] = c;
+        }
+    }
+
+    // add last argument if any
+    if (buf_index > 0) {
+        buffer[buf_index] = '\0';
+        args.args[args.count] = malloc(buf_index + 1);
+        strcpy(args.args[args.count], buffer);
+        args.count++;
+    }
+    
+    return args;
+}
+
+// free parsed arguments
+void free_arguments(Args *args) {
+    for (int i = 0; i < args->count; i++) {
+        free(args->args[i]);
+    }
+}
+
+void handle_exit(char **argv);
+void handle_echo(char **argv);
+void handle_type(char **argv);
+void handle_pwd(char **argv);
+void handle_cd(char **argv);
 
 const Builtin builtins[] = {
     {"exit", handle_exit},
@@ -72,7 +129,7 @@ char *find_command_in_path(const char *command) {
 
         // check if the file exists and is executable
         if (access(fullpath, X_OK) == 0) {
-            // Ritorna una copia allocata dinamicamente del percorso
+            // return a copy of the full path
             char *result = malloc(strlen(fullpath) + 1);
             strcpy(result, fullpath);
             return result;
@@ -100,22 +157,29 @@ void change_directory(const char *path) {
     }
 }
 
-void handle_exit(void) {
+void handle_exit(char **argv) {
     exit(0);
 }
 
-void handle_echo(void) {
-    char *args = strtok(NULL, " ");
-    while (args != NULL) {
-        printf("%s ", args);
-        args = strtok(NULL, " ");
+void handle_echo(char **argv) {
+    // argv[0] is the command name, argv[1] onwards are the arguments
+    for (int i = 1; argv[i] != NULL; i++) {
+        printf("%s", argv[i]);
+        if (argv[i + 1] != NULL) {
+            printf(" ");
+        }
     }
     printf("\n");
 }
 
-void handle_type(void) {
-    // token is the command to check
-    char *token = strtok(NULL, " ");
+void handle_type(char **argv) {
+    // argv[1] is the token to check
+    if (argv[1] == NULL) {
+        printf("type: missing argument\n");
+        return;
+    }
+    
+    char *token = argv[1];
     if (is_builtin(token)) {
         printf("%s is a shell builtin\n", token);
     } else {
@@ -129,7 +193,7 @@ void handle_type(void) {
     }
 }
 
-void handle_pwd(void) {
+void handle_pwd(char **argv) {
     char *cwd = get_current_working_directory();
     if (cwd != NULL) {
         printf("%s\n", cwd);
@@ -139,9 +203,9 @@ void handle_pwd(void) {
     }
 }
 
-void handle_cd(void) {
-    char *dir = strtok(NULL, " ");
+void handle_cd(char **argv) {
     char expanded_path[PATH_MAX];
+    char *dir = argv[1];
 
     if (dir == NULL) {
         printf("cd: missing argument\n");
@@ -170,20 +234,28 @@ void handle_cd(void) {
     change_directory(dir);
 }
 
-// Handle custom command execution
-void handle_external_command(const char *input) {
-    char input_copy[MAX_INPUT];
-    strncpy(input_copy, input, sizeof(input_copy) - 1);
-    input_copy[sizeof(input_copy) - 1] = '\0';
+// handle custom command execution
+void handle_external_command(char **argv) {
+    if (argv[0] == NULL) return;
     
-    char *command = strtok(input_copy, " ");
-    char *fullpath = find_command_in_path(command);
+    char *fullpath = find_command_in_path(argv[0]);
     
     if (fullpath != NULL) {
-        system(input);
+        // reconstruct the full command with arguments
+        char command[MAX_INPUT];
+        command[0] = '\0';
+        
+        for (int i = 0; argv[i] != NULL; i++) {
+            strcat(command, argv[i]);
+            if (argv[i + 1] != NULL) {
+                strcat(command, " ");
+            }
+        }
+        
+        system(command);
         free(fullpath);
     } else {
-        printf("%s: command not found\n", input);
+        printf("%s: command not found\n", argv[0]);
     }
 }
 
@@ -201,25 +273,25 @@ int main(int argc, char *argv[]) {
 
         if (strlen(user_input) == 0) continue;
 
-        // make a copy of user_input to tokenize it
-        char input_copy[MAX_INPUT];
-        strncpy(input_copy, user_input, sizeof(input_copy) - 1);
-        input_copy[sizeof(input_copy) - 1] = '\0';
+        // parse arguments respecting single and double quotes
+        // first argument is the command name
+        Args args = parse_arguments(user_input);
+        
+        if (args.count == 0) continue;
 
-        // extract the first token as command
-        // strtok saves state internally for next calls
-        char *command_name = strtok(input_copy, " ");
-
-        if (command_name == NULL) continue;
-
-        cmd_handler_t handler = find_builtin_handler(command_name);
+        // check if it's a builtin command
+        cmd_handler_t handler = find_builtin_handler(args.args[0]);
 
         if (handler != NULL) {
-            handler();
+            // call handler with argv array
+            handler((char **)args.args);
         } else {
             // try as an external command
-            handle_external_command(user_input);
+            handle_external_command((char **)args.args);
         }
+        
+        // clean up allocated arguments
+        free_arguments(&args);
     }
 
     return 0;
