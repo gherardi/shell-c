@@ -13,7 +13,7 @@
     #define PATH_SEPARATOR ":"
 #endif
 
-#define MAX_INPUT 1024
+// #define MAX_INPUT 1024
 #define MAX_ARGS 64
 
 typedef void (*cmd_handler_t)(char **);
@@ -36,15 +36,20 @@ Args parse_arguments(const char *input) {
     int buf_index = 0;
     int in_single_quote = 0;
     int in_double_quote = 0;
+    int escape_next = 0;
 
     for (int i = 0; input[i] != '\0' && args.count < MAX_ARGS; i++) {
         char c = input[i];
 
-        // handle escape character (but not inside single quotes)
-        if (c == '\\' && !in_single_quote && !in_double_quote) {
+        // handle escape character (outside quotes or inside double quotes)
+        if (c == '\\' && (in_double_quote || !in_single_quote)) {
             // handle escaped characters
             if (i + 1 < strlen(input)) {
-                buffer[buf_index++] = input[++i];
+                char next_char = input[i + 1];
+                // In double quotes, \\ becomes \, \" becomes ", \$ becomes $, etc.
+                // Outside quotes, any character following \ is treated literally
+                buffer[buf_index++] = next_char;
+                i++;
             }
         } else if (c == '\'' && !in_double_quote) {
             // toggle single quote (but not if inside double quotes)
