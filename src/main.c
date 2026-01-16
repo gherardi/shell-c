@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <ctype.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #ifdef _WIN32
     #define PATH_SEPARATOR ";"
@@ -19,8 +20,14 @@
 typedef void (*cmd_handler_t)(char **);
 
 typedef struct {
+    char *filename;
+    int fd_type;  // 1 for stdout (>), 2 for stderr (2>), etc.
+} Redirection;
+
+typedef struct {
     char *args[MAX_ARGS];
     int count;
+    Redirection output_redirect;
 } Args;
 
 typedef struct {
@@ -29,9 +36,10 @@ typedef struct {
 } Builtin;
 
 // parse command line respecting single and double quotes
+// also extracts output redirection (> or 1>)
 // returns Args struct with parsed arguments
 Args parse_arguments(const char *input) {
-    Args args = {{NULL}, 0};
+    Args args = {{NULL}, 0, {NULL, 0}};
     char buffer[MAX_INPUT];
     int buf_index = 0;
     int in_single_quote = 0;
@@ -91,6 +99,26 @@ Args parse_arguments(const char *input) {
         args.count++;
     }
     
+    // process redirections (>, 1>)
+    for (int i = 0; i < args.count; i++) {
+        if (strcmp(args.args[i], ">") == 0 || strcmp(args.args[i], "1>") == 0) {
+            // next argument should be the filename
+            if (i + 1 < args.count) {
+                args.output_redirect.filename = args.args[i + 1];
+                args.output_redirect.fd_type = 1;
+                
+                // remove the redirection operator and filename from args
+                // shift everything down
+                free(args.args[i]);  // free the > or 1>
+                for (int j = i; j < args.count - 2; j++) {
+                    args.args[j] = args.args[j + 2];
+                }
+                args.count -= 2;
+                break;  // only handle first redirection for now
+            }
+        }
+    }
+    
     return args;
 }
 
@@ -106,6 +134,21 @@ void handle_echo(char **argv);
 void handle_type(char **argv);
 void handle_pwd(char **argv);
 void handle_cd(char **argv);
+
+// function that wraps execution with redirection support
+void execute_with_redirection(cmd_handler_t handler, char **args, const Redirection *redirect) {
+    int original_fd = -1;
+    
+    if (redirect->filename != NULL) {
+        original_fd = apply_redirection(redirect);
+    }
+    
+    handler(args);
+    
+    if (original_fd >= 0) {
+        restore_fd(original_fd);
+    }
+}
 
 const Builtin builtins[] = {
     {"exit", handle_exit},
@@ -171,6 +214,35 @@ char *get_current_working_directory() {
     } else {
         free(cwd);
         return NULL;
+    }
+}
+
+// apply output redirection to a file descriptor
+// returns the original fd so it can be restored later
+int apply_redirection(const Redirection *redirect) {
+    if (redirect->filename == NULL || redirect->fd_type == 0) {
+        return -1;  // no redirection
+    }
+    
+    int original_fd = dup(redirect->fd_type);  // save original fd
+    
+    int output_fd = open(redirect->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (output_fd < 0) {
+        perror("open");
+        return original_fd;
+    }
+    
+    dup2(output_fd, redirect->fd_type);
+    close(output_fd);
+    
+    return original_fd;
+}
+
+// restore an original file descriptor
+void restore_fd(int original_fd) {
+    if (original_fd >= 0) {
+        dup2(original_fd, 1);  // restore stdout
+        close(original_fd);
     }
 }
 
@@ -258,7 +330,7 @@ void handle_cd(char **argv) {
 }
 
 // handle custom command execution
-void handle_external_command(char **argv) {
+void handle_external_command(char **argv, const Redirection *redirect) {
     if (argv[0] == NULL) return;
     
     char *fullpath = find_command_in_path(argv[0]);
@@ -270,7 +342,11 @@ void handle_external_command(char **argv) {
         if (pid == -1) {
             perror("fork");
         } else if (pid == 0) {
-            // child process - execute the command
+            // child process - apply redirection before executing
+            if (redirect->filename != NULL) {
+                apply_redirection(redirect);
+            }
+            
             execvp(fullpath, argv);
             // if execvp returns, there was an error
             perror(argv[0]);
@@ -310,11 +386,11 @@ int main(int argc, char *argv[]) {
         cmd_handler_t handler = find_builtin_handler(args.args[0]);
 
         if (handler != NULL) {
-            // call handler with argv array
-            handler((char **)args.args);
+            // call handler with argv array and redirection info
+            execute_with_redirection(handler, (char **)args.args, &args.output_redirect);
         } else {
             // try as an external command
-            handle_external_command((char **)args.args);
+            handle_external_command((char **)args.args, &args.output_redirect);
         }
         
         // clean up allocated arguments
