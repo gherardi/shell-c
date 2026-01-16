@@ -134,6 +134,8 @@ void handle_echo(char **argv);
 void handle_type(char **argv);
 void handle_pwd(char **argv);
 void handle_cd(char **argv);
+int apply_redirection(const Redirection *redirect);
+void restore_fd(int original_fd);
 
 // function that wraps execution with redirection support
 void execute_with_redirection(cmd_handler_t handler, char **args, const Redirection *redirect) {
