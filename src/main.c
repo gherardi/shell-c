@@ -104,12 +104,16 @@ Args parse_arguments(const char *input) {
         if (strcmp(args.args[i], ">") == 0 || strcmp(args.args[i], "1>") == 0) {
             // next argument should be the filename
             if (i + 1 < args.count) {
-                args.output_redirect.filename = args.args[i + 1];
+                // store filename and make a copy since we'll remove it from args
+                args.output_redirect.filename = malloc(strlen(args.args[i + 1]) + 1);
+                strcpy(args.output_redirect.filename, args.args[i + 1]);
                 args.output_redirect.fd_type = 1;
                 
                 // remove the redirection operator and filename from args
-                // shift everything down
                 free(args.args[i]);  // free the > or 1>
+                free(args.args[i + 1]);  // free the filename (we made a copy)
+                
+                // shift everything after the filename down
                 for (int j = i; j < args.count - 2; j++) {
                     args.args[j] = args.args[j + 2];
                 }
@@ -119,6 +123,9 @@ Args parse_arguments(const char *input) {
         }
     }
     
+    // null-terminate the args array for execvp
+    args.args[args.count] = NULL;
+    
     return args;
 }
 
@@ -126,6 +133,10 @@ Args parse_arguments(const char *input) {
 void free_arguments(Args *args) {
     for (int i = 0; i < args->count; i++) {
         free(args->args[i]);
+    }
+    // also free the redirection filename if it was allocated
+    if (args->output_redirect.filename != NULL) {
+        free(args->output_redirect.filename);
     }
 }
 
