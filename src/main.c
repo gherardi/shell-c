@@ -99,18 +99,25 @@ Args parse_arguments(const char *input) {
         args.count++;
     }
     
-    // process redirections (>, 1>)
+    // process redirections (>, 1>, 2>)
     for (int i = 0; i < args.count; i++) {
+        int fd_type = 0;
         if (strcmp(args.args[i], ">") == 0 || strcmp(args.args[i], "1>") == 0) {
+            fd_type = 1;  // stdout
+        } else if (strcmp(args.args[i], "2>") == 0) {
+            fd_type = 2;  // stderr
+        }
+        
+        if (fd_type != 0) {
             // next argument should be the filename
             if (i + 1 < args.count) {
                 // store filename and make a copy since we'll remove it from args
                 args.output_redirect.filename = malloc(strlen(args.args[i + 1]) + 1);
                 strcpy(args.output_redirect.filename, args.args[i + 1]);
-                args.output_redirect.fd_type = 1;
+                args.output_redirect.fd_type = fd_type;
                 
                 // remove the redirection operator and filename from args
-                free(args.args[i]);  // free the > or 1>
+                free(args.args[i]);  // free the redirection operator
                 free(args.args[i + 1]);  // free the filename (we made a copy)
                 
                 // shift everything after the filename down
@@ -146,7 +153,7 @@ void handle_type(char **argv);
 void handle_pwd(char **argv);
 void handle_cd(char **argv);
 int apply_redirection(const Redirection *redirect);
-void restore_fd(int original_fd);
+void restore_fd(int original_fd, int fd_type);
 
 // function that wraps execution with redirection support
 void execute_with_redirection(cmd_handler_t handler, char **args, const Redirection *redirect) {
@@ -159,7 +166,7 @@ void execute_with_redirection(cmd_handler_t handler, char **args, const Redirect
     handler(args);
     
     if (original_fd >= 0) {
-        restore_fd(original_fd);
+        restore_fd(original_fd, redirect->fd_type);
     }
 }
 
@@ -252,9 +259,9 @@ int apply_redirection(const Redirection *redirect) {
 }
 
 // restore an original file descriptor
-void restore_fd(int original_fd) {
+void restore_fd(int original_fd, int fd_type) {
     if (original_fd >= 0) {
-        dup2(original_fd, 1);  // restore stdout
+        dup2(original_fd, fd_type);  // restore the original fd
         close(original_fd);
     }
 }
