@@ -22,6 +22,7 @@ typedef void (*cmd_handler_t)(char **);
 typedef struct {
     char *filename;
     int fd_type;  // 1 for stdout (>), 2 for stderr (2>), etc.
+    int append;   // 1 for append mode (>>), 0 for truncate mode (>)
 } Redirection;
 
 typedef struct {
@@ -99,13 +100,20 @@ Args parse_arguments(const char *input) {
         args.count++;
     }
     
-    // process redirections (>, 1>, 2>)
+    // process redirections (>, 1>, >>, 1>>, 2>)
     for (int i = 0; i < args.count; i++) {
         int fd_type = 0;
+        int append = 0;
+        
         if (strcmp(args.args[i], ">") == 0 || strcmp(args.args[i], "1>") == 0) {
             fd_type = 1;  // stdout
+            append = 0;   // truncate
+        } else if (strcmp(args.args[i], ">>") == 0 || strcmp(args.args[i], "1>>") == 0) {
+            fd_type = 1;  // stdout
+            append = 1;   // append
         } else if (strcmp(args.args[i], "2>") == 0) {
             fd_type = 2;  // stderr
+            append = 0;   // truncate
         }
         
         if (fd_type != 0) {
@@ -115,6 +123,7 @@ Args parse_arguments(const char *input) {
                 args.output_redirect.filename = malloc(strlen(args.args[i + 1]) + 1);
                 strcpy(args.output_redirect.filename, args.args[i + 1]);
                 args.output_redirect.fd_type = fd_type;
+                args.output_redirect.append = append;
                 
                 // remove the redirection operator and filename from args
                 free(args.args[i]);  // free the redirection operator
@@ -246,7 +255,15 @@ int apply_redirection(const Redirection *redirect) {
     
     int original_fd = dup(redirect->fd_type);  // save original fd
     
-    int output_fd = open(redirect->filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    // determine flags based on append mode
+    int flags = O_WRONLY | O_CREAT;
+    if (redirect->append) {
+        flags |= O_APPEND;  // append mode
+    } else {
+        flags |= O_TRUNC;   // truncate mode (default)
+    }
+    
+    int output_fd = open(redirect->filename, flags, 0644);
     if (output_fd < 0) {
         perror("open");
         return original_fd;
