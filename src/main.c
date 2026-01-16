@@ -100,7 +100,7 @@ Args parse_arguments(const char *input) {
         args.count++;
     }
     
-    // process redirections (>, 1>, >>, 1>>, 2>)
+    // process redirections (>, 1>, >>, 1>>, 2>, 2>>)
     for (int i = 0; i < args.count; i++) {
         int fd_type = 0;
         int append = 0;
@@ -114,6 +114,9 @@ Args parse_arguments(const char *input) {
         } else if (strcmp(args.args[i], "2>") == 0) {
             fd_type = 2;  // stderr
             append = 0;   // truncate
+        } else if (strcmp(args.args[i], "2>>") == 0) {
+            fd_type = 2;  // stderr
+            append = 1;   // append
         }
         
         if (fd_type != 0) {
