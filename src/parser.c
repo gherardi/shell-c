@@ -55,6 +55,7 @@ Args parse_arguments(const char *input) {
         int fd_type = 0;
         int append = 0;
         
+        // check for output redirection symbols
         if (strcmp(args.args[i], ">") == 0 || strcmp(args.args[i], "1>") == 0) {
             fd_type = 1;
             append = 0;
@@ -68,7 +69,8 @@ Args parse_arguments(const char *input) {
             fd_type = 2;
             append = 1;
         }
-        
+
+        // if a redirection is found
         if (fd_type != 0) {
             if (i + 1 < args.count) {
                 args.output_redirect.filename = malloc(strlen(args.args[i + 1]) + 1);
@@ -93,9 +95,11 @@ Args parse_arguments(const char *input) {
 }
 
 void free_arguments(Args *args) {
+    // free each argument string
     for (int i = 0; i < args->count; i++) {
         free(args->args[i]);
     }
+    // free redirection filename if allocated
     if (args->output_redirect.filename != NULL) {
         free(args->output_redirect.filename);
     }
