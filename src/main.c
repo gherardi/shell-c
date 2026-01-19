@@ -3,6 +3,7 @@
 #include "builtins.h"
 #include "executor.h"
 #include "completion.h"
+#include "pipeline.h"
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -20,6 +21,13 @@ int main(int argc, char *argv[]) {
         
         // skip empty input
         if (strlen(user_input) == 0) {
+            free(user_input);
+            continue;
+        }
+
+        // Check for pipeline first
+        if (has_pipeline(user_input)) {
+            execute_pipeline(user_input);
             free(user_input);
             continue;
         }
