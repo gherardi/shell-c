@@ -1,5 +1,7 @@
 #include "builtins.h"
 #include "executor.h" // Needed for find_command_in_path used in 'type'
+#include <readline/readline.h>
+#include <readline/history.h> // Required for history functions
 
 typedef struct {
     const char *name;
@@ -34,6 +36,26 @@ void handle_echo(char **argv) {
         }
     }
     printf("\n");
+}
+
+void handle_history(char **argv) {
+    // instead of using history_list, we will iterate manually
+    // history_base is the starting index of history entries
+    // history_length is the total number of entries in history
+    
+    register HIST_ENTRY *entry;
+    int i = 0;
+    
+    // make sure history is set up
+    using_history();
+
+    // iterate through history entries
+    for (i = 0; i < history_length; i++) {
+        entry = history_get(history_base + i);
+        if (entry) {
+            printf("%d %s\n", history_base + i, entry->line);
+        }
+    }
 }
 
 void handle_type(char **argv) {
@@ -99,7 +121,8 @@ const Builtin builtins[] = {
     {"echo", handle_echo},
     {"type", handle_type},
     {"pwd", handle_pwd},
-    {"cd", handle_cd}
+    {"cd", handle_cd},
+    {"history", handle_history}
 };
 
 const int builtin_count = sizeof(builtins) / sizeof(builtins[0]);

@@ -25,6 +25,9 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        // Add input to history
+        add_history(user_input);
+
         // Check for pipeline first
         if (has_pipeline(user_input)) {
             execute_pipeline(user_input);
