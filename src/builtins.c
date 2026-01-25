@@ -38,35 +38,59 @@ void handle_echo(char **argv) {
     printf("\n");
 }
 
+// In builtins.c
+
 void handle_history(char **argv) {
-    // 'history_length' and 'history_base' are global variables provided by readline
-    // history_length: current number of entries in history
-    // history_base: the logical offset of the first entry
+    // handle "history -r <path>"
+    if (argv[1] != NULL && strcmp(argv[1], "-r") == 0) {
+        if (argv[2] == NULL) {
+            printf("history: option requires an argument\n");
+            return;
+        }
+
+        FILE *file = fopen(argv[2], "r");
+        if (file == NULL) {
+            printf("history: %s: cannot open history file\n", argv[2]);
+            return;
+        }
+
+        char line[1024]; // buffer for reading lines
+        // read the file line by line
+        while (fgets(line, sizeof(line), file)) {
+            // remove the trailing newline character
+            line[strcspn(line, "\n")] = 0;
+            
+            // if the line is not empty, add it to the in-memory history
+            if (strlen(line) > 0) {
+                add_history(line);
+            }
+        }
+        fclose(file);
+        return; // return immediately, do not print history
+    }
+
+    // logic for printing history (with optional limit <n>)
     
+    // 'history_length' and 'history_base' are global variables provided by readline
     int limit = 0;
     int start_index = 0;
 
-    // Check if a limit argument is provided (e.g., "history 5")
+    // check if a limit argument is provided (e.g., "history 5") and it's not a flag like -r
     if (argv[1] != NULL) {
         limit = atoi(argv[1]);
         
-        // If the limit is valid and less than the total history length,
+        // if the limit is valid and less than the total history length,
         // adjust the starting index to show only the last 'limit' entries.
         if (limit > 0 && limit < history_length) {
             start_index = history_length - limit;
         }
-        // If limit is invalid or larger than history_length, start_index remains 0 (show all)
     }
 
-    // Iterate through the history entries starting from the calculated index
-    // We use history_get() instead of history_list() for better portability (fixes macOS/libedit issues)
+    // iterate through the history entries starting from the calculated index
     for (int i = start_index; i < history_length; i++) {
-        // Retrieve the entry using the absolute index
         HIST_ENTRY *entry = history_get(history_base + i);
-        
         if (entry) {
-            // Print the entry number and the command line
-            // %5d ensures the numbers are right-aligned
+            // print the entry number and the command line
             printf("%5d  %s\n", history_base + i, entry->line);
         }
     }
