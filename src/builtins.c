@@ -39,21 +39,35 @@ void handle_echo(char **argv) {
 }
 
 void handle_history(char **argv) {
-    // instead of using history_list, we will iterate manually
-    // history_base is the starting index of history entries
-    // history_length is the total number of entries in history
+    // 'history_length' and 'history_base' are global variables provided by readline
+    // history_length: current number of entries in history
+    // history_base: the logical offset of the first entry
     
-    register HIST_ENTRY *entry;
-    int i = 0;
-    
-    // make sure history is set up
-    using_history();
+    int limit = 0;
+    int start_index = 0;
 
-    // iterate through history entries
-    for (i = 0; i < history_length; i++) {
-        entry = history_get(history_base + i);
+    // Check if a limit argument is provided (e.g., "history 5")
+    if (argv[1] != NULL) {
+        limit = atoi(argv[1]);
+        
+        // If the limit is valid and less than the total history length,
+        // adjust the starting index to show only the last 'limit' entries.
+        if (limit > 0 && limit < history_length) {
+            start_index = history_length - limit;
+        }
+        // If limit is invalid or larger than history_length, start_index remains 0 (show all)
+    }
+
+    // Iterate through the history entries starting from the calculated index
+    // We use history_get() instead of history_list() for better portability (fixes macOS/libedit issues)
+    for (int i = start_index; i < history_length; i++) {
+        // Retrieve the entry using the absolute index
+        HIST_ENTRY *entry = history_get(history_base + i);
+        
         if (entry) {
-            printf("%d %s\n", history_base + i, entry->line);
+            // Print the entry number and the command line
+            // %5d ensures the numbers are right-aligned
+            printf("%5d  %s\n", history_base + i, entry->line);
         }
     }
 }
