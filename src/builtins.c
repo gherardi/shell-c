@@ -24,7 +24,24 @@ void change_directory(const char *path) {
     }
 }
 
+void save_history_to_file(void) {
+    char *histfile = getenv("HISTFILE");
+    if (histfile != NULL) {
+        FILE *file = fopen(histfile, "w");
+        if (file != NULL) {
+            for (int i = 0; i < history_length; i++) {
+                HIST_ENTRY *entry = history_get(history_base + i);
+                if (entry && entry->line) {
+                    fprintf(file, "%s\n", entry->line);
+                }
+            }
+            fclose(file);
+        }
+    }
+}
+
 void handle_exit(char **argv) {
+    save_history_to_file();
     exit(0);
 }
 
