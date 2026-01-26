@@ -14,10 +14,31 @@ int main(int argc, char *argv[]) {
     // set up tab completion
     setup_completion();
 
+    // load history from HISTFILE on startup
+    char *histfile = getenv("HISTFILE");
+    if (histfile != NULL) {
+        FILE *file = fopen(histfile, "r");
+        if (file != NULL) {
+            char line[1024];
+            while (fgets(line, sizeof(line), file)) {
+                // remove trailing newline
+                line[strcspn(line, "\n")] = 0;
+                if (strlen(line) > 0) {
+                    add_history(line);
+                }
+            }
+            fclose(file);
+        }
+    }
+
     while (1) {
         char *user_input = readline("$ ");
         
-        if (user_input == NULL) break; // EOF (Ctrl+D)
+        if (user_input == NULL) {
+            // EOF (Ctrl+D): save history before exiting
+            save_history_to_file();
+            break;
+        }
         
         // skip empty input
         if (strlen(user_input) == 0) {
