@@ -38,9 +38,11 @@ void handle_echo(char **argv) {
     printf("\n");
 }
 
-// In builtins.c
-
 void handle_history(char **argv) {
+    // static variable to track the index of the next command to be appended.
+    // initialized to 0, it persists across function calls.
+    static int history_append_index = 0;
+
     // handle "history -r <path>"
     if (argv[1] != NULL && strcmp(argv[1], "-r") == 0) {
         if (argv[2] == NULL) {
@@ -92,6 +94,35 @@ void handle_history(char **argv) {
             }
         }
         
+        fclose(file);
+        return;
+    }
+
+    // handle "history -a <path>" (Append new commands to file)
+    if (argv[1] != NULL && strcmp(argv[1], "-a") == 0) {
+        if (argv[2] == NULL) {
+            printf("history: option requires an argument\n");
+            return;
+        }
+
+        // open file in append mode
+        FILE *file = fopen(argv[2], "a");
+        if (file == NULL) {
+            printf("history: %s: cannot open history file\n", argv[2]);
+            return;
+        }
+
+        // iterate from the last appended index up to the current history length
+        for (int i = history_append_index; i < history_length; i++) {
+            HIST_ENTRY *entry = history_get(history_base + i);
+            if (entry && entry->line) {
+                fprintf(file, "%s\n", entry->line);
+            }
+        }
+
+        // update the tracking index so future calls only append new commands
+        history_append_index = history_length;
+
         fclose(file);
         return;
     }
