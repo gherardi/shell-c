@@ -69,6 +69,33 @@ void handle_history(char **argv) {
         return; // return immediately, do not print history
     }
 
+    // handle "history -w <path>" (write to file)
+    if (argv[1] != NULL && strcmp(argv[1], "-w") == 0) {
+        if (argv[2] == NULL) {
+            printf("history: option requires an argument\n");
+            return;
+        }
+
+        // Open with "w" mode to create file or truncate existing content
+        FILE *file = fopen(argv[2], "w");
+        if (file == NULL) {
+            printf("history: %s: cannot open history file\n", argv[2]);
+            return;
+        }
+
+        // Iterate through all history entries in memory
+        for (int i = 0; i < history_length; i++) {
+            HIST_ENTRY *entry = history_get(history_base + i);
+            if (entry && entry->line) {
+                // Write line to file with a trailing newline
+                fprintf(file, "%s\n", entry->line);
+            }
+        }
+        
+        fclose(file);
+        return;
+    }
+
     // logic for printing history (with optional limit <n>)
     
     // 'history_length' and 'history_base' are global variables provided by readline
