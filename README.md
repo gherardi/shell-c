@@ -1,34 +1,35 @@
-[![progress-banner](https://backend.codecrafters.io/progress/shell/54cbe00f-3843-4b40-97ce-be9365e26755)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# shell-c
 
-This is a starting point for C solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+A custom implementation of a UNIX-like shell written in C.
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+## Description
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+`shell-c` is a robust, custom-built UNIX-like shell that enables direct interaction with the kernel and efficient process execution. This project focuses on the core mechanics of operating systems, including process lifecycle management, file descriptor manipulation, and low-level system calls.
 
-# Passing the first stage
+The implementation features an advanced command parser capable of handling complex quote nesting and environment variable expansion. It also bridges the gap between low-level functionality and user experience by integrating command-line autocompletion and a persistent command history.
 
-The entry point for your `shell` implementation is in `src/main.c`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+### Key Features
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+* **Process & Filesystem Control:** Managed low-level process execution, foreground/background task handling, and filesystem navigation.
+* **I/O Redirection & Piping:** Engineered seamless data flow between processes using pipes and redirection for `stdin`, `stdout`, and `stderr`.
+* **Advanced Command Parsing:** Accurate processing of complex command strings, including nested quotes and variable expansion.
+* **Enhanced UX:** Integrated command autocompletion and history management for an intuitive terminal interface.
+
+## Usage
+
+```bash
+# Start the shell
+./your_program.sh
+
+# Example of piping and redirection
+cat input.txt | grep "pattern" > output.txt
+
+# Filesystem navigation
+cd /usr/src/utils
+
 ```
 
-Time to move on to the next stage!
+## Getting Started
 
-# Stage 2 & beyond
-
-Note: This section is for stages 2 and beyond.
-
-1. Ensure you have `cmake` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main.c`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+1. **Clone the repository:** Download the source code to your local machine.
+2. **Requirements:** Ensure you have a C compiler (like `gcc`) and the `readline` library installed.
